@@ -21,6 +21,7 @@ import (
 	"github.com/snwfdhmp/duck/cmd"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"os"
 	"os/exec"
 )
 
@@ -40,7 +41,7 @@ func main() {
 		return
 	}
 	if !exists {
-		color.Yellow("Warning: not a duck repository")
+		//color.Yellow("Warning: not a duck repository")
 		cmd.Execute()
 		return
 	}
@@ -95,8 +96,11 @@ func getPackagesPaths(includePath string) []string {
 }
 
 type duckCommand struct {
-	Name string
-	Cmd  string
+	Name      string
+	Shortcut  string
+	Cmd       string
+	ShortHelp string
+	LongHelp  string
 }
 
 func scanCommands(paths []string) ([]duckCommand, error) {
@@ -111,10 +115,12 @@ func scanCommands(paths []string) ([]duckCommand, error) {
 			if sections[j].Name() == "DEFAULT" {
 				continue
 			}
-			command := sections[j].Key("cmd")
 			cmds = append(cmds, duckCommand{
-				Name: sections[j].Name(),
-				Cmd:  command.String(),
+				Name:      sections[j].Name(),
+				Cmd:       sections[j].Key("cmd").String(),
+				Shortcut:  sections[j].Key("shortcut").String(),
+				ShortHelp: sections[j].Key("help").String(),
+				LongHelp:  sections[j].Key("longHelp").String(),
 			})
 		}
 	}
@@ -124,15 +130,17 @@ func scanCommands(paths []string) ([]duckCommand, error) {
 func createCobraCommands(cmds []duckCommand) {
 	for i := 0; i < len(cmds); i++ {
 		var tmpCmd = &cobra.Command{
-			Use:   cmds[i].Name,
-			Short: "",
-			Long:  ``,
+			Use:     cmds[i].Name,
+			Short:   cmds[i].ShortHelp,
+			Long:    cmds[i].LongHelp,
+			Aliases: []string{cmds[i].Shortcut},
 			Run: func(cmd *cobra.Command, args []string) {
 				i := cmd.DuckCmdIndex
 				execCmd := exec.Command("sh", "-c", cmds[i].Cmd)
 				out, err := execCmd.Output()
 				if err != nil {
-					color.Red(err.Error())
+					color.Red(string(out))
+					os.Exit(1)
 				}
 				fmt.Print(string(out))
 			},
