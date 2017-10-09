@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/go-ini/ini"
 	homedir "github.com/mitchellh/go-homedir"
@@ -113,4 +114,17 @@ func loadProjectConfig() error {
 	}
 
 	return nil
+}
+
+func getConfigString(str string) (string, error) {
+	arr := strings.Split(str, ".")
+	section, err := projectCfg.GetSection(arr[0])
+	if err != nil {
+		return "", err
+	}
+	key, err := section.GetKey(arr[1])
+	if err != nil {
+		return "", err
+	}
+	return key.String(), nil
 }

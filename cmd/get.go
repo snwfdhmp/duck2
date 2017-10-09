@@ -136,7 +136,6 @@ to quickly create a Cobra application.`,
 
 				color.Green("Successfully installed '" + pkgColor(args[i]) + color.New(color.FgGreen).Sprint("' from ") + repoColor(name))
 			}
-
 		}
 	},
 }
