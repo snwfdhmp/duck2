@@ -15,15 +15,22 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
+	"github.com/go-ini/ini"
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var cfgFile string
+
+var (
+	projectCfg *ini.File
+)
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -49,7 +56,7 @@ func Execute() {
 	}
 }
 
-func init() { 
+func init() {
 	cobra.OnInitialize(initConfig)
 
 	// Here you will define your flags and configuration settings.
@@ -86,4 +93,24 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+}
+
+func loadProjectConfig() error {
+	fs := afero.NewOsFs()
+
+	exists, err := afero.Exists(fs, ".duck/conf.ini")
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		return errors.New("'.duck/conf.ini' seems not to exist.")
+	}
+
+	projectCfg, err = ini.Load(".duck/conf.ini")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
