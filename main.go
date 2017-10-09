@@ -15,7 +15,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/fatih/color"
 	"github.com/go-ini/ini"
 	"github.com/snwfdhmp/duck/cmd"
@@ -137,12 +136,14 @@ func createCobraCommands(cmds []duckCommand) {
 			Run: func(cmd *cobra.Command, args []string) {
 				i := cmd.DuckCmdIndex
 				execCmd := exec.Command("sh", "-c", cmds[i].Cmd)
-				out, err := execCmd.Output()
+				execCmd.Stderr = os.Stderr
+				execCmd.Stdout = os.Stdout
+				execCmd.Stdin = os.Stdin
+				err := execCmd.Run()
 				if err != nil {
-					color.Red(string(out))
+					color.Red("An error occured while executing this command. Error: " + err.Error())
 					os.Exit(1)
 				}
-				fmt.Print(string(out))
 			},
 			DuckCmdIndex: i,
 		}
