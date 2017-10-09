@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -22,9 +23,11 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 //add -f to force creation of dir
+var nocheck bool
 
 // getCmd represents the get command
 var getCmd = &cobra.Command{
@@ -72,59 +75,76 @@ to quickly create a Cobra application.`,
 			for j := 0; j < len(arr); j++ {
 				currentPath += "/" + arr[j]
 				if j < len(arr)-1 {
-					exists, err := afero.Exists(fs, currentPath)
-					if err != nil {
-						color.Red("Could not test whether '" + currentPath + "' exists or not. (not implemented: use -f to force)")
-						color.Red("Error: " + err.Error())
-						return
-					}
-					if exists {
-						continue
+					if !nocheck {
+						exists, err := afero.Exists(fs, currentPath)
+						if err != nil {
+							color.Red("Could not test whether '" + currentPath + "' exists or not. (not implemented: use --no-check to force)")
+							color.Red("Error: " + err.Error())
+							return
+						}
+						if exists {
+							continue
+						}
 					}
 					err = fs.Mkdir(currentPath, 0777)
 					if err != nil {
 						color.Red("Could not create '" + currentPath)
 						color.Red("Error: " + err.Error())
-						return
+						if !nocheck {
+							return
+						}
 					}
 				} else {
-					exists, err := afero.Exists(fs, currentPath)
-					if err != nil {
-						color.Red("Could not test whether '" + currentPath + "' exists or not. (not implemented: use -f to force)")
-						color.Red("Error: " + err.Error())
-						return
+					if !nocheck {
+						currentPath += ".duckpkg.ini"
+						exists, err := afero.Exists(fs, currentPath)
+						if err != nil {
+							color.Red("Could not test whether '" + currentPath + "' exists or not. (not implemented: use --no-check to force)")
+							color.Red("Error: " + err.Error())
+							return
+						}
+						if exists && !force {
+							color.Red("This package seems to be already installed. Use -f to install over")
+							return
+						}
 					}
-					if exists {
-						color.Red("This package seems to be already installed. Use -f to install over")
-						return
-					}
-					out, err = fs.Create(currentPath + ".duckpkg.ini")
+					out, err = fs.Create(currentPath)
 					if err != nil {
 						color.Red("Could not create '" + currentPath)
 						color.Red("Error: " + err.Error())
-						return
+						if !nocheck {
+							return
+						}
 					}
 				}
 			}
 			defer out.Close()
-			url := "http://raw.githubusercontent.com/snwfdhmp/duck-core/master/" + args[i] + ".duckpkg.ini"
-			resp, err := http.Get(url)
-			if err != nil {
-				color.Red("Could not download from '" + url + "'")
-				color.Red("Error: " + err.Error())
-				return
+			repos := viper.GetStringMap("repos")
+			repoColor := color.New(color.FgCyan).Sprint
+			pkgColor := color.New(color.FgYellow).Sprint
+			for name, url := range repos {
+				pkgUrl := fmt.Sprintf("%s%s.duckpkg.ini", url, args[i])
+				resp, err := http.Get(pkgUrl) //test errors
+				if err != nil {
+					color.Red("Could not download from '" + pkgUrl + "'")
+					color.Red("Error: " + err.Error())
+					return
+				}
+				defer resp.Body.Close()
+
+				_, err = io.Copy(out, resp.Body)
+
+				color.Green("Successfully installed '" + pkgColor(args[i]) + color.New(color.FgGreen).Sprint("' from ") + repoColor(name))
 			}
-			defer resp.Body.Close()
 
-			_, err = io.Copy(out, resp.Body)
-
-			color.Green("Successfully installed '" + args[i] + "'")
 		}
 	},
 }
 
 func init() {
 	RootCmd.AddCommand(getCmd)
+	getCmd.Flags().BoolVarP(&force, "force", "f", false, "replace package if existing")
+	getCmd.Flags().BoolVar(&nocheck, "no-check", false, "skip file/folder existance checking")
 
 	// Here you will define your flags and configuration settings.
 
